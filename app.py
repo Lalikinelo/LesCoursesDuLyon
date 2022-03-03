@@ -40,11 +40,13 @@ def send_file(path):
     path_dict=json.loads(path)
     url = "http://wxs.ign.fr/choisirgeoportail/isochrone/isochrone.json?location="+str(path_dict["lng"])+","+str(path_dict["lat"])+"&method=Time&graphName=Pieton&exclusions=&time=600&holes=false&smoothing=true"
     
-    #url = """http://wxs.ign.fr/choisirgeoportail/isochrone/isochrone.json?location=4.84312,45.74610&method=Time&graphName=Voiture&exclusions=&time=300&holes=false&smoothing=true"""
     
     response = requests.get(url)    
      
     dict = response.json()
+
+
+    
     geomWKT=dict['wktGeometry']
 
 
