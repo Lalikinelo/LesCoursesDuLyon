@@ -1,3 +1,5 @@
+var position =''
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////// fonction pour debuguer: liste tous les arguments d'un objet javascript /////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,18 +61,24 @@ var scale = L.control.scale(
 // Pop-up à l'entrée du site
 map.locate({setView: true, watch: false, maxZoom: 14})
         .on('locationfound', async function (e) {
-                
-            var isochrone_data = await fetchAsync("/"+JSON.stringify(e.latlng));
             
-            var isochrone_layer = L.geoJson(isochrone_data).addTo(map);
+            //console.log(e)
+            //var itineraire, isochrone, bulle, commerces_bulle = await fetchAsync("/"+JSON.stringify(e.latlng));
+            //console.log(e.latlng)
 
-            var marker = L.marker([e.latitude, e.longitude]).bindTooltip('Vous êtes ici : '+String(e.latitude)+" ; "+String(e.longitude));
-            map.addLayer(marker);
+            console.log(await fetchAsync("/"+JSON.stringify(e.latlng)))
+            
+            //var isochrone_layer = L.geoJson(isochrone).addTo(map);
+            //var marker = L.marker([e.latitude, e.longitude]).bindTooltip('Vous êtes ici : '+String(e.latitude)+" ; "+String(e.longitude));
+            //map.addLayer(marker);
         })
        .on('locationerror', function(e){
             console.log(e);
             alert("Location access denied.");
         });
+
+console.log(listerToutesLesProprietes(map))
+console.log(map)  
 
 // Bouton sur la carte
 L.control.locate({
@@ -280,6 +288,12 @@ function change_categorie() {
   
   // zoom the map to the polyline
   map.fitBounds(commerces.getBounds(), { reset: true });
+
+
+  
+/////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// creation de la bulle ///////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
 
 
