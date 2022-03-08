@@ -1,4 +1,4 @@
-var position =''
+var user_position =''
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////// fonction pour debuguer: liste tous les arguments d'un objet javascript /////////////////////////
@@ -41,6 +41,10 @@ map.setView([45.7640, 4.8357], 12);
 // FullScreen
 map.addControl(new L.Control.Fullscreen());
 
+
+//Gestion couche
+var group_layer = new L.layerGroup();
+
 /////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////// Echelle ////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
@@ -55,70 +59,7 @@ var scale = L.control.scale(
 ).addTo(map);
 
 /////////////////////////////////////////////////////////////////////////////////
-//////////////////////////// Connaitre votre position ///////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
-
-// Pop-up à l'entrée du site
-map.locate({setView: true, watch: false, maxZoom: 14})
-        .on('locationfound', async function (e) {
-            
-            //console.log(e)
-            //var itineraire, isochrone, bulle, commerces_bulle = await fetchAsync("/"+JSON.stringify(e.latlng));
-            //console.log(e.latlng)
-
-            console.log(await fetchAsync("/"+JSON.stringify(e.latlng)))
-            
-            //var isochrone_layer = L.geoJson(isochrone).addTo(map);
-            //var marker = L.marker([e.latitude, e.longitude]).bindTooltip('Vous êtes ici : '+String(e.latitude)+" ; "+String(e.longitude));
-            //map.addLayer(marker);
-        })
-       .on('locationerror', function(e){
-            console.log(e);
-            alert("Location access denied.");
-        });
-
-console.log(listerToutesLesProprietes(map))
-console.log(map)  
-
-// Bouton sur la carte
-L.control.locate({
-    position: 'topleft',
-    strings: {
-        title: "Localisez-vous !"
-    }
-}).addTo(map);
-
-/////////////////////////////////////////////////////////////////////////////////
-///////////////////////////// Connaitre votre adresse ///////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
-/*
-var geocoder = L.Control.geocoder(
-    options = {
-        position: 'topleft',
-        placeholder: 'Entrez votre adresse'},
-).addTo(map);
-var div_geocoder = document.getElementsByClassName('leaflet-control-geocoder')[0]
-div_geocoder
-*/
-
-var geocoderBAN = L.geocoderBAN({ 
-    collapsed: false, 
-    style: 'searchBar',
-    resultsNumber: 5,
-    placeholder: 'Entrez votre adresse'
-}).addTo(map)
-
-/////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////// Chargement des données /////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
-data = JSON.parse(document.getElementById("getdata").dataset.markers);
-data = data[0][0]
-//Gestion couche
-var group_layer = new L.layerGroup();
-
-
-/////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////// Economie circulaire /////////////////////////////
+/////////////////////////////// style commerces /////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
 
 // Définition du style en fonction du type de commerce
@@ -157,40 +98,147 @@ function getColors(properties) {
       };}}
 
 
-// Ajout du geoJSON
-var commerces = L.geoJson(data, {
-    style : function(feature) {
-        return {
-            radius: 6,
-            color: 'white',
-            weight: 1,
-            fillOpacity: 1
-        }},
-    pointToLayer: function (feature, latlng) {
-          var popupOptions = { maxWith: 200 };
-          var popupContent = "Nom: " + feature.properties.name ;
-      return L.circleMarker(latlng, getColors(feature.properties)).bindPopup(popupContent, popupOptions);
-    },
-    onEachFeature: mouse_events}).addTo(map);
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////// Afficher les commerces sur la carte//////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
-// Ajout d'évènements : zoom + buffer + couleur
-function mouse_events(feature, leaflet_object){
-    leaflet_object.on('click', function(event){
-        map.setView(event.latlng, 16);
-    });
-    leaflet_object.on('mouseover', function(event){
-        var leaflet_object = event.target;
-        leaflet_object.setRadius(12),
-        leaflet_object.setStyle({
-            color: "white",
-            weight: 5})
-    });
-    leaflet_object.on('mouseout', function(event){
-        var leaflet_object = event.target;
-        commerces.resetStyle(leaflet_object),
-        leaflet_object.setRadius(6)});}
+function affiche_commerces (data){
+    // Ajout du geoJSON
+    var commerces = L.geoJson(data, {
+        style : function(feature) {
+            return {
+                radius: 6,
+                color: 'white',
+                weight: 1,
+                fillOpacity: 1
+            }},
+        pointToLayer: function (feature, latlng) {
+            var popupOptions = { maxWith: 200 };
+            var popupContent = "Nom: " + feature.properties.name ;
+        return L.circleMarker(latlng, getColors(feature.properties)).bindPopup(popupContent, popupOptions);
+        },
+        onEachFeature: mouse_events}).addTo(map);
 
-// Légende
+    // Ajout d'évènements : zoom + buffer + couleur
+    function mouse_events(feature, leaflet_object){
+        leaflet_object.on('click', function(event){
+            map.setView(event.latlng, 16);
+        });
+        leaflet_object.on('mouseover', function(event){
+            var leaflet_object = event.target;
+            leaflet_object.setRadius(12),
+            leaflet_object.setStyle({
+                color: "white",
+                weight: 5})
+        });
+        leaflet_object.on('mouseout', function(event){
+            var leaflet_object = event.target;
+            commerces.resetStyle(leaflet_object),
+            leaflet_object.setRadius(6)});}
+
+
+    map.fitBounds(commerces.getBounds());
+
+    // set maxBounds
+    map.setMaxBounds(commerces.getBounds());
+    
+    // zoom the map to the polyline
+    map.fitBounds(commerces.getBounds(), { reset: true })    
+
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////// filtrer les commerces sur la carte//////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+
+
+function change_categorie() {
+    var type_com = document.getElementById("test");
+    var type_comm = test.options[test.selectedIndex].text;
+    
+    group_layer.clearLayers();
+
+    if (type_comm=='Afficher toutes les données'){
+        affiche_commerces(data)
+    }
+    else{ 
+        //Wtransforme en string pour pouvoir le parcourir
+        var my_json = JSON.stringify(data)
+        
+        // applique le filtre
+        var data_filter = JSON.parse(my_json).features.filter(function (entry) {
+            return entry.properties.classe === type_comm;
+        });       
+        
+        affiche_commerces(data_filter)
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////// Afficher la bulle sur la carte //////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+        
+
+
+function affiche_bulle (data){
+    // Ajout du geoJSON
+    var bulle = L.geoJson(data).addTo(map)
+    }
+
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////// Afficher la bulle sur la carte //////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+        
+
+
+function affiche_itinéraire (data){
+    // Ajout du geoJSON
+    var itineraire = L.geoJson(data).addTo(map)
+    
+    }
+
+
+    /////////////////////////////////////////////////////////////////////////////////
+/////////////////////// Afficher la bulle sur la carte //////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+        
+
+
+function affiche_itinéraire (data){
+    // Ajout du geoJSON
+    var bulle = L.geoJson(data).addTo(map)
+    }
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// Connaitre votre adresse ///////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+
+var geocoderBAN = L.geocoderBAN({ 
+    collapsed: false, 
+    style: 'searchBar',
+    resultsNumber: 5,
+    placeholder: 'Entrez votre adresse'
+}).addTo(map)
+
+
+// Bouton sur la carte
+L.control.locate({
+    position: 'topleft',
+    strings: {
+        title: "Localisez-vous !"
+    }
+}).addTo(map);
+
+
+
+/////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// Légende ///////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+
 L.control.Legend({
     position: "bottomright",
     title:' ',
@@ -233,73 +281,49 @@ L.control.Legend({
 }).addTo(map);
 
 
-/////////////////////////////////////////////////////////////////////////////////
-///////////////////////////// Appliquer le filtre ///////////////////////////
-////////////////////////////////////////////////////////////////////
-change_categorie()
-
-function change_categorie() {
-    var type_com = document.getElementById("test");
-    var type_comm = test.options[test.selectedIndex].text;
-    if (type_comm=='Afficher toutes les données'){
-        commerces.addTo(group_layer);
-        group_layer.addTo(map);
-        console.log('toto');
-        console.log(type_comm);
-    }else 
-    //console.log('toto')
-    //console.log(type_comm);
-    group_layer.clearLayers();
-    var commerces_filter = L.geoJson(data, {
-        style : function(feature) {
-            return {
-                radius: 6,
-                color: 'white',
-                weight: 1,
-                fillOpacity: 1
-            }},
-
-        pointToLayer: function (feature, latlng) {
-              var popupOptions = { maxWith: 200 };
-              var popupContent = "Nom: " + feature.properties.name ;
-          return L.circleMarker(latlng, getColors(feature.properties)).bindPopup(popupContent, popupOptions)},
-
-        filter: function (feature, layer) {
-            return feature.properties.classe == type_comm;
-        },
-        
-    onEachFeature: mouse_events
-
-    }).addTo(group_layer);
-    group_layer.addTo(map);
-}
-
 
 
 
 /////////////////////////////////////////////////////////////////////////////////
-////////////////////////////// Frontière sur la carte ///////////////////////////
+///////////// Chargement des tous les commerces au 1er chargement////////////////
 /////////////////////////////////////////////////////////////////////////////////
+data = JSON.parse(document.getElementById("getdata").dataset.markers);
+data = data[0][0]
 
-  map.fitBounds(commerces.getBounds());
+console.log(data)
 
-  // set maxBounds
-  map.setMaxBounds(commerces.getBounds());
-  
-  // zoom the map to the polyline
-  map.fitBounds(commerces.getBounds(), { reset: true });
+affiche_commerces(data)
 
 
-  
 /////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// creation de la bulle ///////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
 
+document.getElementById('find_bulle').addEventListener("click", function() {
+    
+    // recupere la posiotn de l'utilisateur
+    map.locate({setView: true, watch: false, maxZoom: 14})
+        .on('locationfound', position= async function (e) {
+        
+        // calcul de la bulle
+        data = await fetchAsync("/"+JSON.stringify(e.latlng))
 
+        console.log(data['commerces_bulle'])
+        console.log(data['isochrone'])
+        console.log(data['bulle'])
+        console.log(data['itineraire'])
+        // supprime les couches existantes
+        group_layer.clearLayers();
 
+        affiche_commerces(data['commerces_bulle'])
+        affiche_isochrone(data['isochrone'])
+        affiche_bulle(data['bulle'])
+        affiche_itinéraire(data['itineraire'])
 
-
-
-
+        })
+        .on('locationerror', function(e){
+            alert("Location access denied.");
+        });
+}, false);
 
 
