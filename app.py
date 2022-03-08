@@ -60,7 +60,7 @@ def send_file(path):
 
     print(geomWKT)
 
-    # Convert to a shapely.geometry.polygon.Polygon object
+    # Convert to a shapely.geometry.polygon.Polygon objects
     g1 = shapely.wkt.loads(geomWKT)
 
     g2 = geojson.Feature(geometry=g1, properties={})
