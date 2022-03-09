@@ -25,37 +25,40 @@ def index():
 
     cursor = connection.cursor()
 
-    cursor.execute("""select json_build_object(
-                'type', 'FeatureCollection',
-                'features', json_agg(ST_AsGeoJSON(eco_circulaire.*)::json)
-            ) as geojson
-            from eco_circulaire""")
+    cursor.execute("""select json_build_object('type', 'FeatureCollection','features', json_agg(ST_AsGeoJSON( t.*)::json )) as geojson 
+    from (eco_circulaire
+    inner JOIN association
+        ON eco_circulaire.gid=association.gid
+    inner JOIN sous_categ
+        ON association.id_sous_categ=sous_categ.id_sous_categ
+    inner JOIN categ
+        ON sous_categ.id_categ=categ.id_categ ) as t""")
     
     markers=cursor.fetchall()
 
-    cursor.execute("""select distinct classe from eco_circulaire order by classe asc""")
-    classes=[c for c, in cursor.fetchall()]
+    #cursor.execute("""select distinct classe from eco_circulaire order by classe asc""")
+    #classes=[c for c, in cursor.fetchall()]
 
     cursor.execute("""select distinct nom_categ from categ order by nom_categ asc""")
     categs=[c for c, in cursor.fetchall()] 
-    return render_template("Accueil.html", markers=markers,classes=classes,categs=categs)
+
+    return render_template("Accueil.html", markers=markers,categs=categs)
 
 
 #Récupérer données de la page html indiquée apres le /
-@app.route('/<path:path>')
+@app.route('/itineraire/<path:path>')
 def send_file(path):
-    
-    
-    
+    print(path)
     arg=path.split("&")
     # recuperation de la position de l'utilisateur    
     path_dict=json.loads(arg[0])
-    
     user_position=str(path_dict["lng"])+","+str(path_dict["lat"])
-    cat_course=arg[1]
+    
+    # Recuperation des categories de courses
+    cat_course=arg[1].split(',')
 
-    user_position="4.8357,45.7750"
-    cat_course='Alimentaire'
+    #user_position="4.8357,45.7850"
+    #cat_course='Alimentaire'
 
 ################### Récupère l'isochrone de 10 min à pied auitour de la position de l'utilisateur  ##############
     url = "http://wxs.ign.fr/choisirgeoportail/isochrone/isochrone.json?location="+user_position+"&method=Time&graphName=Pieton&exclusions=&time=600&holes=false&smoothing=true"
@@ -71,7 +74,6 @@ def send_file(path):
 
     # conversion en string
     isochrone = geojson.dumps(g2)
-
 
     
     ################## recupere toutes les données #########################
@@ -95,58 +97,110 @@ def send_file(path):
     gdf_tout_com= gpd.GeoDataFrame.from_features(json_c_for_c[0]["features"])
     gdf_tout_com.crs = "epsg:4326"
 
-
-
     ################## recupere les commerces dans l isochrone filtré par catégorie #########################
 
-    cursor.execute("""select json_build_object('type', 'FeatureCollection','features', json_agg(ST_AsGeoJSON( t.*)::json )) as geojson 
-    from (eco_circulaire
-    inner JOIN association
-        ON eco_circulaire.gid=association.gid
-    inner JOIN sous_categ
-        ON association.id_sous_categ=sous_categ.id_sous_categ
-    inner JOIN categ
-        ON sous_categ.id_categ=categ.id_categ ) as t   
-    WHERE t.nom_categ='"""+cat_course+"""' AND ST_Intersects(ST_GeomFromText('"""+geomWKT+"""',4326), t.geom)=TRUE and ST_IsValid(t.geom);
-    """)
+    # taille du buffer. Augmente si 0 commerces dans l'isochrone de base
+    radius=0
 
-    # where ST_Intersects(ST_GeomFromText('"+geomWKT+"',4326), eco_circulaire.geom)=TRUE; ")
+    # Nombre de commerces dans l'isochrone
+    nb_com=0
+    
+    # construction de la requete sql
+    def build_request(cat_course,geomWKT,radius):
+        request="""SELECT json_build_object('type', 'FeatureCollection','features', json_agg(ST_AsGeoJSON( t.*)::json )) as geojson 
+        from (eco_circulaire
+        inner JOIN association
+            ON eco_circulaire.gid=association.gid
+        inner JOIN sous_categ
+            ON association.id_sous_categ=sous_categ.id_sous_categ
+        inner JOIN categ
+            ON sous_categ.id_categ=categ.id_categ ) as t   
+        WHERE ST_Intersects(ST_Buffer(ST_ForceRHR(ST_Boundary(ST_GeomFromText('"""+geomWKT+"""',4326))),"""+str(radius)+""", 'side=left'), t.geom)=TRUE 
+        AND ST_IsValid(t.geom) AND (
+        """
+        # Ajouter des categories de commerces delmandées par l'utilisateur
+        i=0
+        for cat in cat_course:
+            # uniquement pour la 1ere categorie
+            if i==0:
+                request=request+"t.nom_categ='"+cat+"'" 
+            else:
+                request=request+" OR t.nom_categ='"+cat+"'" 
+            i=i+1
+    
+        request=request+');'
+        print(request)
+        return request
+
+    score_max = 0
+    iteration = 0
+    
+    # calcul du score minimum
+    # le score minimum doit augmenter avec le nb de catégories cochées
+    score_minimum=len(cat_course)+9
+
+    # agrandi l'isochrone par un buffer tant qu'il n'y a pas au moins 4 commerces dedans 
+    while (nb_com<=2 or score_max<score_minimum) and iteration <11:
+    
+        #Augmentation du beffer
+        cursor.execute(build_request(cat_course,geomWKT,radius))
+        radius=radius+0.0049
+        #récupération du json
+        json_c_for_c=[c for c, in cursor.fetchall()]
+
+        # astuce car len(None) fait planter
+        try:
+            nb_com=len(json_c_for_c[0]['features'])
+        except:
+            nb_com=0
+
+        if(nb_com>0):    
+            gdf_com_dans_iso = gpd.GeoDataFrame.from_features(json_c_for_c[0]["features"])
+
+            ############### creation des bulles ##################
+            gdf_com_dans_iso.crs = "epsg:4326"
+
+            gdf_com_dans_iso_buff=gdf_com_dans_iso
+            gdf_com_dans_iso_buff.geometry=gdf_com_dans_iso.to_crs(2154).buffer(200).geometry
+            # Numerotation des bulles
+            gdf_com_dans_iso_buff.insert(0, 'num_bulle', range(0, len(gdf_com_dans_iso_buff)))
 
 
-    #récupération du json
-    json_c_for_c=[c for c, in cursor.fetchall()]
+            ############### recupérationn des commerces dans les bulles #############################
 
-    gdf_com_dans_iso = gpd.GeoDataFrame.from_features(json_c_for_c[0]["features"])
+            com_in_200m = gpd.overlay(gdf_com_dans_iso_buff,gdf_tout_com.to_crs(2154), how='intersection',keep_geom_type=False)
+            
+            com_in_200m.rename(columns={ 'nom_categ_2' : 'nom_categ'}, inplace=True)
+            
 
+            # suppression des colnnes inutiles
+            #for col_name in com_in_200m.columns: 
+            #    print(col_name)
+                #com_in_200m.drop(columns=[col_name])
 
-    ############### creation des bulles ##################
-    gdf_com_dans_iso.crs = "epsg:4326"
+        
+            ############## Calcul du score de diversité pour chaque bulle  #########################
 
-    gdf_com_dans_iso_buff=gdf_com_dans_iso
-    gdf_com_dans_iso_buff.geometry=gdf_com_dans_iso.to_crs(2154).buffer(200).geometry
-    # Numerotation des bulles
-    gdf_com_dans_iso_buff.insert(0, 'num_bulle', range(0, len(gdf_com_dans_iso_buff)))
+            #com_in_200m['diversite'] = com_in_200m.groupby('num_bulle')['nom_sous_categ_2'].value_counts()
 
-    #com_in_200m=gdf_tout_com.loc[best_com.to_crs(2154).buffer(200).intersects(gdf_tout_com.to_crs(2154))]
+            id_best_bulle=com_in_200m.groupby('num_bulle').nom_sous_categ_2.nunique().idxmax()
+            
+            score_max = com_in_200m.groupby('num_bulle').nom_sous_categ_2.nunique().max()
 
+            iteration = iteration +1
+            print("id des bulles trouvées et score:")
+            print(com_in_200m.groupby('num_bulle').nom_sous_categ_2.nunique())
+            print(" score max de la bulle : "+str(score_max))
+            print(" iteration : "+str(iteration))
+            #print(nb_com<=2)
+            #print(score_max<score_minimum)
+            #print(iteration <11)
 
+    if iteration >= 10:
+        return 'pas de bulle'
 
-    ############### recupérationn des commerces dans les bulles #############################
-
-
-    com_in_200m = gpd.overlay(gdf_com_dans_iso_buff,gdf_tout_com.to_crs(2154), how='intersection',keep_geom_type=False)
-
-
-    ############## Calcul du score de diversité pour chaque bulle  #########################
-
-    #com_in_200m['diversite'] = com_in_200m.groupby('num_bulle')['nom_sous_categ_2'].value_counts()
-
-    id_best_bulle=com_in_200m.groupby('num_bulle').nom_sous_categ_2.nunique().idxmax()
-
-
-
-    #                                                                                   #s
-    # que faire en cas d'égalité? comment sortir les 3 meilleurs qui soient séparées    #
+    #                                                                                   #
+    # que faire en cas d'égalité de score?                                              #
     #                                                                                   #
 
 
@@ -163,7 +217,7 @@ def send_file(path):
 
     best_bulle_buff = gdf_com_dans_iso_buff.to_crs(4326).loc[gdf_com_dans_iso_buff.num_bulle == id_best_bulle]
 
-    bulle=best_bulle_buff.to_json()
+    bulle=best_bulle_buff.to_json() 
 
     centre_bulle=best_bulle_buff.to_crs(4326).centroid
 
@@ -178,7 +232,8 @@ def send_file(path):
     # conversion en string
     itineraire = json.dumps(dict)
 
-    response={'itineraire':itineraire, 'isochrone': isochrone, 'bulle': bulle, 'commerces_bulle':commerces_bulle }    
+    response={'itineraire':itineraire, 'isochrone': isochrone, 'bulle': bulle, 'commerces_bulle':commerces_bulle } 
+     
     return response
 
 
