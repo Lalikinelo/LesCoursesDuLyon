@@ -36,29 +36,33 @@ def index():
     cursor.execute("""select distinct classe from eco_circulaire order by classe asc""")
     classes=[c for c, in cursor.fetchall()]
 
-    return render_template("Accueil.html", markers=markers,classes=classes)
+    cursor.execute("""select distinct nom_categ from categ order by nom_categ asc""")
+    categs=[c for c, in cursor.fetchall()] 
+    return render_template("Accueil.html", markers=markers,classes=classes,categs=categs)
 
 
 #Récupérer données de la page html indiquée apres le /
 @app.route('/<path:path>')
 def send_file(path):
     
+    
+    
+    arg=path.split("&")
+    # recuperation de la position de l'utilisateur    
+    path_dict=json.loads(arg[0])
+    
+    user_position=str(path_dict["lng"])+","+str(path_dict["lat"])
+    cat_course=arg[1]
+
+    user_position="4.8357,45.7750"
     cat_course='Alimentaire'
 
-    
-    # recuperation de la position de l'utilisateur    
-    path_dict=json.loads(path)
-    user_position=str(path_dict["lng"])+","+str(path_dict["lat"])
-    user_position="4.8357,45.7640"
-
-################### Récupère l'isochrone de 10 min à pied auitour de la posiution de l'utilisateur  ##############
+################### Récupère l'isochrone de 10 min à pied auitour de la position de l'utilisateur  ##############
     url = "http://wxs.ign.fr/choisirgeoportail/isochrone/isochrone.json?location="+user_position+"&method=Time&graphName=Pieton&exclusions=&time=600&holes=false&smoothing=true"
     
     response = requests.get(url)    
     dict = response.json()
     geomWKT=dict['wktGeometry']
-
-    print(geomWKT)
 
     # Convert to a shapely.geometry.polygon.Polygon objects
     g1 = shapely.wkt.loads(geomWKT)
@@ -95,8 +99,6 @@ def send_file(path):
 
     ################## recupere les commerces dans l isochrone filtré par catégorie #########################
 
-
-
     cursor.execute("""select json_build_object('type', 'FeatureCollection','features', json_agg(ST_AsGeoJSON( t.*)::json )) as geojson 
     from (eco_circulaire
     inner JOIN association
@@ -105,7 +107,7 @@ def send_file(path):
         ON association.id_sous_categ=sous_categ.id_sous_categ
     inner JOIN categ
         ON sous_categ.id_categ=categ.id_categ ) as t   
-    WHERE t.nom_categ='Alimentaire' AND ST_Intersects(ST_GeomFromText('"""+geomWKT+"""',4326), t.geom)=TRUE and ST_IsValid(t.geom);
+    WHERE t.nom_categ='"""+cat_course+"""' AND ST_Intersects(ST_GeomFromText('"""+geomWKT+"""',4326), t.geom)=TRUE and ST_IsValid(t.geom);
     """)
 
     # where ST_Intersects(ST_GeomFromText('"+geomWKT+"',4326), eco_circulaire.geom)=TRUE; ")
@@ -113,8 +115,6 @@ def send_file(path):
 
     #récupération du json
     json_c_for_c=[c for c, in cursor.fetchall()]
-
-    print(json_c_for_c)
 
     gdf_com_dans_iso = gpd.GeoDataFrame.from_features(json_c_for_c[0]["features"])
 
@@ -169,8 +169,8 @@ def send_file(path):
 
 
     #########  itineraire vers le meilleur commerce ##############
-    url = """https://wxs.ign.fr/calcul/geoportail/itineraire/rest/1.0.0/route?resource=bdtopo-pgr&profile=pedestrian&optimization=fastest&start=""""""+position+"&end="+str(centre_bulle.x.values[0])+","+str(centre_bulle.y.values[0])+""""""&intermediates=&constraints={"constraintType": "banned","key":"wayType","operator":"=","value":"tunnel"}&geometryFormat=geojson&getSteps=true&getBbox=true&waysAttributes=cleabs&timeUnit=minute"""
-    
+    url = """https://wxs.ign.fr/calcul/geoportail/itineraire/rest/1.0.0/route?resource=bdtopo-pgr&profile=pedestrian&optimization=fastest&start="""+user_position+"&end="+str(centre_bulle.x.values[0])+","+str(centre_bulle.y.values[0])+"""&intermediates=&constraints={"constraintType": "banned","key":"wayType","operator":"=","value":"tunnel"}&geometryFormat=geojson&getSteps=true&getBbox=true&waysAttributes=cleabs&timeUnit=minute"""
+
     response = requests.get(url)    
 
     # conversion bytes vers dict     
