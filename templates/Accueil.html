@@ -142,8 +142,12 @@
                       </select>
                       
                 </form>
-                <a href="https://nicepage.one" class="u-btn u-btn-round u-button-style u-hover-palette-1-light-1 u-palette-1-base u-radius-50 u-btn-2">Créer un itinéraire !</a>
-                <a href="https://nicepage.one" class="u-btn u-btn-round u-button-style u-hover-palette-1-light-1 u-palette-1-base u-radius-50 u-btn-3">Type de commerce</a>
+                <button id="find_bulle"  class="u-btn u-btn-round u-button-style u-hover-palette-1-light-1 u-palette-1-base u-radius-50 u-btn-2">Créer un itinéraire !</button>
+                <select id="choix_commerce" class="u-btn u-btn-round u-button-style u-hover-palette-1-light-1 u-palette-1-base u-radius-50 u-btn-3">
+                  {% for nom_categ in categs %}
+                  <option value={{ nom_categ }} class="u-border-1 u-border-grey-30 u-input u-input-rectangle">{{ nom_categ }}</option>
+                  {% endfor %}
+                </select>
               </div>
             </div>
           </div>
