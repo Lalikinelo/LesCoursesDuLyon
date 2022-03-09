@@ -1,4 +1,6 @@
-var user_position =''
+var user_position ='';
+var tout_com_limit=0;
+var premier_lancement=true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////// fonction pour debuguer: liste tous les arguments d'un objet javascript /////////////////////////
@@ -64,33 +66,37 @@ var scale = L.control.scale(
 
 // Définition du style en fonction du type de commerce
 function getColors(properties) {
-    if (properties.classe === "Anti Gaspillage") {
+    if (properties.nom_categ === "Alimentaire") {
       return {
         fillColor: "#da6770",
       };
-    } else if (properties.classe === "Commerce Alimentaire") {
+    } else if (properties.nom_categ === "Restauration") {
       return {
         fillColor: "#8ca96f",
       };
-    } else if (properties.classe === "Commerce Non Alimentaire") {
+    } else if (properties.nom_categ === "Activite") {
         return {
         fillColor: "#478ac9",
         };
-    } else if (properties.classe === "Conseil et Accompagnement social") {
+    } else if (properties.nom_categ === "Dechet") {
         return {
         fillColor: "#a377c9",
         };
-    } else if (properties.classe === "Dechet Bio") {
+    } else if (properties.nom_categ === "Equipement Maison") {
         return {
         fillColor: "#f2a941",
         };
-    } else if (properties.classe === "Donnation non alimentaire") {
+    } else if (properties.nom_categ === "Bien etre") {
         return {
         fillColor: "#e0df72",
         };
-    } else if (properties.classe === "Atelier et Seconde Vie") {
+    } else if (properties.nom_categ === "Don") {
         return {
         fillColor: "grey",
+        };
+    } else if (properties.nom_categ === "Reparation") {
+        return {
+        fillColor: "black",
         };
     } else {
       return {
@@ -141,7 +147,10 @@ function affiche_commerces(data){
 
     // set maxBounds
     map.setMaxBounds(commerces.getBounds());
-    
+    if (premier_lancement==true){
+        premier_lancement==false;
+        tout_com_limit = commerces.getBounds()
+    }
     // zoom the map to the polyline
     map.fitBounds(commerces.getBounds(), { reset: true })    
 
@@ -167,7 +176,7 @@ function change_categorie() {
         
         // applique le filtre
         var data_filter = JSON.parse(my_json).features.filter(function (entry) {
-            return entry.properties.classe === type_comm;
+            return entry.properties.nom_categ === type_comm;
         });       
         
         affiche_commerces(data_filter)
@@ -245,10 +254,10 @@ L.control.Legend({
     position: "bottomright",
     title:' ',
     legends: [{
-        label: "Anti Gaspillage",
+        label: "Alimentaire",
         type: "circle",
         radius: 6,
-        fillColor: '#da6770',
+        fillColor: "#da6770",
 },{
         label: "Atelier et Seconde Vie",
         type: "circle",
@@ -284,7 +293,22 @@ L.control.Legend({
 
 
 
+/////////////////////////////////////////////////////////////////////////////////
+///////////// chopix du type de courses ////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
+var checkboxes = document.querySelectorAll("#choix_commerce");
+var liste_course = []
+
+// Use Array.forEach to add an event listener to each checkbox.
+checkboxes.forEach(function(checkbox) {
+  checkbox.addEventListener('change', (event) => {
+    liste_course = 
+      Array.from(checkboxes) // Convert checkboxes to an array to use filter and map.
+      .filter(i => i.checked) // Use Array.filter to remove unchecked checkboxes.
+      .map(i => i.value) // Use Array.map to extract only the checkbox values from the array of objects.
+      console.log(liste_course.toString())
+  })});
 
 /////////////////////////////////////////////////////////////////////////////////
 ///////////// Chargement des tous les commerces au 1er chargement////////////////
@@ -304,26 +328,46 @@ document.getElementById('find_bulle').addEventListener("click", function() {
     // recupere la posiotn de l'utilisateur
     map.locate({setView: true, watch: false, maxZoom: 14})
         .on('locationfound', position= async function (e) {
-        
-        // recupere le type de commerce choisi
-        var type_com = choix_commerce.options[choix_commerce.selectedIndex].text;
+            
+            
+            e.latlng.lat=45.7850;
+            e.latlng.lng=4.8557;
+            //4.8357
+            if(liste_course.length>0){
+                if (tout_com_limit.contains(e.latlng)==true){
 
-        // calcul de la bulle
-        data_fetch = await fetchAsync("/"+JSON.stringify(e.latlng)+"&"+type_com)
+                    // calcul de la bulle
+                    data_fetch = await fetchAsync("/itineraire/"+JSON.stringify(e.latlng)+"&"+liste_course.toString())
 
-        // supprime les couches existantes
+                    if (data_fetch == 'pas de bulle'){
+                        alert("Notre service ne trouve pas de bulle pour votre recherche...");
 
-        group_layer.clearLayers();
+                    }
+                    else{
+                        // supprime les couches existantes
+                        group_layer.clearLayers();
 
-        affiche_commerces(JSON.parse(data_fetch['commerces_bulle']))
-        affiche_isochrone(JSON.parse(data_fetch['isochrone']))
-        affiche_bulle(JSON.parse(data_fetch['bulle']))
-        affiche_itineraire(JSON.parse(data_fetch['itineraire']).geometry)
+                        affiche_commerces(JSON.parse(data_fetch['commerces_bulle']));
+                        console.log(data_fetch['commerces_bulle'])
+                        affiche_isochrone(JSON.parse(data_fetch['isochrone']));
+                        affiche_bulle(JSON.parse(data_fetch['bulle']));
+                        affiche_itineraire(JSON.parse(data_fetch['itineraire']).geometry);
+                        }
+                    }
 
-        })
-        .on('locationerror', function(e){
-            alert("Location access denied.");
-        });
+                else{
+                    alert("vous êtes trop loin des commerces...");
+                    affiche_commerces(data);
+                    }
+                }
+            else{
+                alert("vous devez choisir un type de courses avant de calculer un itinéraire ...");
+                }
+            })
+            .on('locationerror', function(e){
+                alert("Où êtes vous?? Veuillez accorder l'accès à votre position actuelle dans votre navigateur.");
+            });
+
 }, false);
 
 
