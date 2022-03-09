@@ -136,17 +136,18 @@
                 <form action="#" method="POST" class="u-clearfix u-form-horizontal u-form-spacing-15 u-inner-form" style="padding: 15px;" source="custom">
                   <select name="liste" Id="test"  onChange="change_categorie()" class="u-form-address u-form-group u-label-none u-form-group-1">
                     <option value=alldata>Afficher toutes les données</option>
-                    {% for classe in classes %}
+                    {% for nom_categ in categs %}
                     <option value={{ classe }} class="u-border-1 u-border-grey-30 u-input u-input-rectangle">{{ classe }}</option>
                         {% endfor %}
                       </select>
                       
                 </form>
                 <button id="find_bulle"  class="u-btn u-btn-round u-button-style u-hover-palette-1-light-1 u-palette-1-base u-radius-50 u-btn-2">Créer un itinéraire !</button>
-                <select id="choix_commerce" class="u-btn u-btn-round u-button-style u-hover-palette-1-light-1 u-palette-1-base u-radius-50 u-btn-3">
-                  {% for nom_categ in categs %}
-                  <option value={{ nom_categ }} class="u-border-1 u-border-grey-30 u-input u-input-rectangle">{{ nom_categ }}</option>
-                  {% endfor %}
+                <div id="filtre_course" class="u-btn u-btn-round u-button-style u-hover-palette-1-light-1 u-palette-1-base u-radius-50 u-btn-3" >
+                    {% for nom_categ in categs %}
+                    <input type="checkbox" id="choix_commerce" name="settings"  class="u-button-style u-nav-link u-text-active-black u-text-hover-palette-2-base" value={{ nom_categ }}>{{ nom_categ }} <br/>
+                    {% endfor %}
+                </div>
                 </select>
               </div>
             </div>
