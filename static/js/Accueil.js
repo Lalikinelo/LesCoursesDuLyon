@@ -102,7 +102,7 @@ function getColors(properties) {
 /////////////////////// Afficher les commerces sur la carte//////////////////////
 /////////////////////////////////////////////////////////////////////////////////
 
-function affiche_commerces (data){
+function affiche_commerces(data){
     // Ajout du geoJSON
     var commerces = L.geoJson(data, {
         style : function(feature) {
@@ -181,33 +181,35 @@ function change_categorie() {
         
 
 
-function affiche_bulle (data){
+function affiche_bulle (data_bulle){
     // Ajout du geoJSON
-    var bulle = L.geoJson(data).addTo(map)
+    var bulle = L.geoJson(data_bulle).addTo(map)
     }
 
 /////////////////////////////////////////////////////////////////////////////////
-/////////////////////// Afficher la bulle sur la carte //////////////////////////
+/////////////////////// Afficher l itineraire sur la carte //////////////////////
 /////////////////////////////////////////////////////////////////////////////////
         
 
 
-function affiche_itinéraire (data){
+function affiche_itineraire(data_iti){
     // Ajout du geoJSON
-    var itineraire = L.geoJson(data).addTo(map)
-    
+    var itineraire = L.geoJson(data_iti).addTo(map)
+
     }
 
 
-    /////////////////////////////////////////////////////////////////////////////////
-/////////////////////// Afficher la bulle sur la carte //////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////// Afficher l isochronesur la carte //////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
         
 
 
-function affiche_itinéraire (data){
+function affiche_isochrone(data_iso){
     // Ajout du geoJSON
-    var bulle = L.geoJson(data).addTo(map)
+    var bulle = L.geoJson(data_iso).addTo(map)
+    map.fitBounds(bulle.getBounds());
+
     }
 
 
@@ -290,8 +292,6 @@ L.control.Legend({
 data = JSON.parse(document.getElementById("getdata").dataset.markers);
 data = data[0][0]
 
-console.log(data)
-
 affiche_commerces(data)
 
 
@@ -305,20 +305,20 @@ document.getElementById('find_bulle').addEventListener("click", function() {
     map.locate({setView: true, watch: false, maxZoom: 14})
         .on('locationfound', position= async function (e) {
         
-        // calcul de la bulle
-        data = await fetchAsync("/"+JSON.stringify(e.latlng))
+        // recupere le type de commerce choisi
+        var type_com = choix_commerce.options[choix_commerce.selectedIndex].text;
 
-        console.log(data['commerces_bulle'])
-        console.log(data['isochrone'])
-        console.log(data['bulle'])
-        console.log(data['itineraire'])
+        // calcul de la bulle
+        data_fetch = await fetchAsync("/"+JSON.stringify(e.latlng)+"&"+type_com)
+
         // supprime les couches existantes
+
         group_layer.clearLayers();
 
-        affiche_commerces(data['commerces_bulle'])
-        affiche_isochrone(data['isochrone'])
-        affiche_bulle(data['bulle'])
-        affiche_itinéraire(data['itineraire'])
+        affiche_commerces(JSON.parse(data_fetch['commerces_bulle']))
+        affiche_isochrone(JSON.parse(data_fetch['isochrone']))
+        affiche_bulle(JSON.parse(data_fetch['bulle']))
+        affiche_itineraire(JSON.parse(data_fetch['itineraire']).geometry)
 
         })
         .on('locationerror', function(e){
