@@ -129,7 +129,6 @@ def send_file(path):
             i=i+1
     
         request=request+');'
-        print(request)
         return request
 
     score_max = 0
@@ -140,7 +139,7 @@ def send_file(path):
     score_minimum=len(cat_course)+9
 
     # agrandi l'isochrone par un buffer tant qu'il n'y a pas au moins 4 commerces dedans 
-    while (nb_com<=3 or score_max<score_minimum) and iteration <11:
+    while (nb_com<=4 or score_max<score_minimum) and iteration <11:
     
         #Augmentation du beffer
         cursor.execute(build_request(cat_course,geomWKT,radius))
@@ -181,8 +180,6 @@ def send_file(path):
         
             ############## Calcul du score de diversité pour chaque bulle  #########################
 
-            #com_in_200m['diversite'] = com_in_200m.groupby('num_bulle')['nom_sous_categ_2'].value_counts()
-
             id_best_bulle=com_in_200m.groupby('num_bulle').nom_sous_categ_2.nunique().idxmax()
             
             score_max = com_in_200m.groupby('num_bulle').nom_sous_categ_2.nunique().max()
@@ -192,12 +189,11 @@ def send_file(path):
             print(com_in_200m.groupby('num_bulle').nom_sous_categ_2.nunique())
             print(" score max de la bulle : "+str(score_max))
             print(" iteration : "+str(iteration))
-            #print(nb_com<=2)
-            #print(score_max<score_minimum)
-            #print(iteration <11)
+
 
     if iteration >= 10:
-        return 'pas de bulle'
+        response ={'message': 'pas de bulle'}
+        return response
 
     #                                                                                   #
     # que faire en cas d'égalité de score?                                              #
@@ -232,7 +228,7 @@ def send_file(path):
     # conversion en string
     itineraire = json.dumps(dict)
 
-    response={'itineraire':itineraire, 'isochrone': isochrone, 'bulle': bulle, 'commerces_bulle':commerces_bulle } 
+    response={'itineraire':itineraire, 'isochrone': isochrone, 'bulle': bulle, 'commerces_bulle':commerces_bulle, 'message': 'fund'} 
      
     return response
 
