@@ -128,6 +128,7 @@
                   <div id="filtre_course" >
                     {% for nom_categ in categs %}
                         <input type="checkbox" id="choix_commerce" name="settings" value={{ nom_categ }}>
+                        <input type="hidden" id="choix_commerce" name="settings" value='none'> 
                         <label for={{ nom_categ }} data-content="{{ nom_categ }}">{{ nom_categ }}</label>
   
                         <br/>
