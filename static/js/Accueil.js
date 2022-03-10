@@ -1,5 +1,4 @@
 var user_position ='';
-var tout_com_limit=0;
 var premier_lancement=true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,6 +41,12 @@ map.setView([45.7640, 4.8357], 12);
 
 // FullScreen
 map.addControl(new L.Control.Fullscreen());
+var layerControl = L.control.layers().addTo(map);
+layerControl.options={collapsed:false}
+
+// limitation de la navigation à Lyon
+var p1 = L.point( 45.913444276,5.021678272), p2 = L.point(45.582896678, 4.703865076), bounds_gd_lyon = L.bounds(p1, p2);
+map.setMaxBounds(bounds_gd_lyon);
 
 
 //Gestion couche
@@ -65,38 +70,42 @@ var scale = L.control.scale(
 /////////////////////////////////////////////////////////////////////////////////
 
 // Définition du style en fonction du type de commerce
-function getColors(properties) {
-    if (properties.nom_categ === "Alimentaire") {
+function getColors(nom_categ) {
+    if (nom_categ === "Dechet") {
       return {
-        fillColor: "#da6770",
+        fillColor: "#b3de69",
       };
-    } else if (properties.nom_categ === "Restauration") {
+    } else if (nom_categ === "Alimentaire") {
       return {
-        fillColor: "#8ca96f",
+        fillColor: "#fb8072",
       };
-    } else if (properties.nom_categ === "Activite") {
+    } else if (nom_categ === "Textile") {
         return {
-        fillColor: "#478ac9",
+        fillColor: "#80b1d3",
         };
-    } else if (properties.nom_categ === "Dechet") {
+    } else if (nom_categ === "Activite") {
         return {
-        fillColor: "#a377c9",
+        fillColor: "#bebada",
         };
-    } else if (properties.nom_categ === "Equipement Maison") {
+    } else if (nom_categ === "Bien etre") {
         return {
-        fillColor: "#f2a941",
+        fillColor: "#fccde5",
         };
-    } else if (properties.nom_categ === "Bien etre") {
+    } else if (nom_categ === "Equipement Maison") {
         return {
-        fillColor: "#e0df72",
+        fillColor: "#8dd3c7",
         };
-    } else if (properties.nom_categ === "Don") {
+    } else if (nom_categ === "Restauration") {
         return {
-        fillColor: "grey",
+        fillColor: "#fdb462",
         };
-    } else if (properties.nom_categ === "Reparation") {
+    } else if (nom_categ === "Don") {
         return {
-        fillColor: "black",
+        fillColor: "#ffffb3",
+        };
+    } else if (nom_categ === "Reparation") {
+        return {
+        fillColor: "#d9d9d9",
         };
     } else {
       return {
@@ -109,22 +118,7 @@ function getColors(properties) {
 /////////////////////////////////////////////////////////////////////////////////
 
 function affiche_commerces(data){
-    // Ajout du geoJSON
-    var commerces = L.geoJson(data, {
-        style : function(feature) {
-            return {
-                radius: 6,
-                color: 'white',
-                weight: 1,
-                fillOpacity: 1
-            }},
-        pointToLayer: function (feature, latlng) {
-            var popupOptions = { maxWith: 200 };
-            var popupContent = "Nom: " + feature.properties.name ;
-        return L.circleMarker(latlng, getColors(feature.properties)).bindPopup(popupContent, popupOptions);
-        },
-        onEachFeature: mouse_events}).addTo(map);
-
+    
     // Ajout d'évènements : zoom + buffer + couleur
     function mouse_events(feature, leaflet_object){
         leaflet_object.on('click', function(event){
@@ -139,20 +133,47 @@ function affiche_commerces(data){
         });
         leaflet_object.on('mouseout', function(event){
             var leaflet_object = event.target;
-            commerces.resetStyle(leaflet_object),
+            leaflet_object.setStyle({
+                color: "white",
+                weight: 1}),
             leaflet_object.setRadius(6)});}
+    
+    
+    // Ajout du geoJSON
+
+    var categs = ['Activite','Alimentaire','Bien etre','Dechet','Don','Equipement Maison','Reparation','Restauration','Textile']; 
 
 
-    map.fitBounds(commerces.getBounds());
+    // Ajout des points, une couche par categorie de commerce
+    categs.forEach(function(categ) {
+        var commerces = L.geoJson(data, {
+            style : function(feature) {
+                return {
+                    radius: 6,
+                    color: 'white',
+                    weight: 1,
+                    fillOpacity: 1
+                }},
 
-    // set maxBounds
-    map.setMaxBounds(commerces.getBounds());
-    if (premier_lancement==true){
-        premier_lancement==false;
-        tout_com_limit = commerces.getBounds()
-    }
-    // zoom the map to the polyline
-    map.fitBounds(commerces.getBounds(), { reset: true })    
+            pointToLayer: function (feature, latlng) {
+                var marker = L.circleMarker(latlng, getColors(feature.properties.nom_categ)).bindPopup(
+                    '<styleTitre><p style= "font-weight : bold">'+feature.properties.name+'</p></styleTitre><styleColonne><p style= "font-weight : bold">Catégorie</styleColonne><br><styleText>'+feature.properties.nom_categ+'</styleText><styleColonne><p style= "font-weight : bold">Offre</styleColonne><br><styleText>'+feature.properties.offre_stru+'</styleText><styleColonne><p style= "font-weight : bold">Adresse</styleColonne><br><styleText>'+feature.properties.numvoie+' '+feature.properties.voie+' '+feature.properties.code_posta+' '+feature.properties.commune+'</styleText>',
+                    {className: feature.properties.nom_categ_esp + "_popup"});
+                marker.on('click', function(ev) { marker.openPopup(marker.getLatLng()) })
+                return marker 
+                },
+
+            onEachFeature: mouse_events,
+
+            filter: function(feature, layer) {
+                return feature.properties.nom_categ == categ;
+            }, 
+        
+        }).addTo(map);
+
+        layerControl.addOverlay(commerces,'<i style="background-color:'+getColors(categ).fillColor+'; padding:5px ; border:1px solid black ; border-radius:4px; width: 20px; position: relative;">&nbsp;&nbsp;&nbsp;&nbsp;</i> '+categ);
+        
+    });    
 
 }
 
@@ -209,7 +230,7 @@ function affiche_itineraire(data_iti){
 
 
 /////////////////////////////////////////////////////////////////////////////////
-/////////////////////// Afficher l isochronesur la carte //////////////////////////
+/////////////////////// Afficher l isochrone sur la carte //////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
         
 
@@ -249,7 +270,7 @@ L.control.locate({
 /////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// Légende ///////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
-
+/* 
 L.control.Legend({
     position: "bottomright",
     title:' ',
@@ -257,41 +278,51 @@ L.control.Legend({
         label: "Alimentaire",
         type: "circle",
         radius: 6,
-        fillColor: "#da6770",
+        fillColor: '#fb8072',
 },{
-        label: "Atelier et Seconde Vie",
+        label: "Bien etre",
         type: "circle",
         radius: 6,
-        fillColor: 'grey',
+        fillColor: '#fccde5',
 },{
-        label: "Commerce Alimentaire",
+        label: "Equipement Maison",
         type: "circle",
         radius: 6,
-        fillColor: '#8ca96f',
+        fillColor: '#8dd3c7',
 },{
-        label: "Commerce Non Alimentaire",
+        label: "Textile",
         type: "circle",
         radius: 6,
-        fillColor: '#478ac9',
+        fillColor: '#80b1d3',
 },{
-        label: "Conseil et Accompagnement social",
+        label: "Don",
         type: "circle",
         radius: 6,
-        fillColor: '#a377c9',
+        fillColor: '#ffffb3',
 },{
-        label: "Déchet Bio",
+        label: "Activite",
         type: "circle",
         radius: 6,
-        fillColor: '#f2a941',
+        fillColor: '#bebada',
 },{
-        label: "Donnation non alimentaire",
+        label: "Restauration",
         type: "circle",
         radius: 6,
-        fillColor: '#e0df72',
+        fillColor: '#fdb462',
+},{
+        label: "Reparation",
+        type: "circle",
+        radius: 6,
+        fillColor: '#d9d9d9',
+},{
+    label: "Dechet",
+    type: "circle",
+    radius: 6,
+    fillColor: '#b3de69',
 }]
 }).addTo(map);
 
-
+ */
 
 /////////////////////////////////////////////////////////////////////////////////
 ///////////// chopix du type de courses ////////////////
@@ -334,7 +365,8 @@ document.getElementById('find_bulle').addEventListener("click", function() {
             e.latlng.lng=4.8557;
             //4.8357
             if(liste_course.length>0){
-                if (tout_com_limit.contains(e.latlng)==true){
+
+                if (bounds_gd_lyon.contains([[e.latlng.lat, e.latlng.lng]])==true){
 
                     // calcul de la bulle
                     data_fetch = await fetchAsync("/itineraire/"+JSON.stringify(e.latlng)+"&"+liste_course.toString())
