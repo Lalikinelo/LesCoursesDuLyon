@@ -140,7 +140,7 @@ def send_file(path):
     score_minimum=len(cat_course)+9
 
     # agrandi l'isochrone par un buffer tant qu'il n'y a pas au moins 4 commerces dedans 
-    while (nb_com<=2 or score_max<score_minimum) and iteration <11:
+    while (nb_com<=3 or score_max<score_minimum) and iteration <11:
     
         #Augmentation du beffer
         cursor.execute(build_request(cat_course,geomWKT,radius))
@@ -161,7 +161,7 @@ def send_file(path):
             gdf_com_dans_iso.crs = "epsg:4326"
 
             gdf_com_dans_iso_buff=gdf_com_dans_iso
-            gdf_com_dans_iso_buff.geometry=gdf_com_dans_iso.to_crs(2154).buffer(200).geometry
+            gdf_com_dans_iso_buff.geometry=gdf_com_dans_iso.to_crs(2154).buffer(300).geometry
             # Numerotation des bulles
             gdf_com_dans_iso_buff.insert(0, 'num_bulle', range(0, len(gdf_com_dans_iso_buff)))
 
@@ -246,15 +246,15 @@ def qui_sommes_nous():
 
 @app.route('/A-propos')
 def a_propos():
-    return render_template("/A-propos.html")
+    return render_template("A-propos.html")
 
 @app.route('/Tutoriel')
-def turo():
-    return render_template("/Tutoriel.html")
+def tuto():
+    return render_template("Tutoriel.html")
 
 @app.route('/Login')
 def login():
-    return render_template("/Login.html")
+    return render_template("Login.html")
 
 if __name__ == '__main__':
     app.run(debug=True)
