@@ -1,5 +1,4 @@
 var user_position ='';
-var premier_lancement=true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////// fonction pour debuguer: liste tous les arguments d'un objet javascript /////////////////////////
@@ -177,33 +176,6 @@ function affiche_commerces(data){
 
 }
 
-/////////////////////////////////////////////////////////////////////////////////
-/////////////////////// filtrer les commerces sur la carte//////////////////////
-/////////////////////////////////////////////////////////////////////////////////
-
-
-function change_categorie() {
-    var type_com = document.getElementById("test");
-    var type_comm = test.options[test.selectedIndex].text;
-    
-    group_layer.clearLayers();
-
-    if (type_comm=='Afficher toutes les données'){
-        affiche_commerces(data)
-    }
-    else{ 
-        //Wtransforme en string pour pouvoir le parcourir
-        var my_json = JSON.stringify(data)
-        
-        // applique le filtre
-        var data_filter = JSON.parse(my_json).features.filter(function (entry) {
-            return entry.properties.nom_categ === type_comm;
-        });       
-        
-        affiche_commerces(data_filter)
-    }
-}
-
 
 /////////////////////////////////////////////////////////////////////////////////
 /////////////////////// Afficher la bulle sur la carte //////////////////////////
@@ -211,9 +183,10 @@ function change_categorie() {
         
 
 
-function affiche_bulle (data_bulle){
+function affiche_bulle(data_bulle){
     // Ajout du geoJSON
     var bulle = L.geoJson(data_bulle).addTo(map)
+    layer.setZIndex(2) 
     }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -225,7 +198,7 @@ function affiche_bulle (data_bulle){
 function affiche_itineraire(data_iti){
     // Ajout du geoJSON
     var itineraire = L.geoJson(data_iti).addTo(map)
-
+    layer.setZIndex(3) 
     }
 
 
@@ -257,72 +230,17 @@ var geocoderBAN = L.geocoderBAN({
 }).addTo(map)
 
 
-// Bouton sur la carte
-L.control.locate({
-    position: 'topleft',
-    strings: {
-        title: "Localisez-vous !"
+geocoderBAN.markGeocode = function (feature) {
+    var latlng = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]]
+    map.setView(latlng, 14)
+    user_position= {lat:latlng[0],lng:latlng[1]};
+    console.log(user_position)
+
+    var popup = L.popup()
+      .setLatLng(latlng)
+      .setContent(feature.properties.label)
+      .openOn(map)
     }
-}).addTo(map);
-
-
-
-/////////////////////////////////////////////////////////////////////////////////
-///////////////////////////// Légende ///////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
-/* 
-L.control.Legend({
-    position: "bottomright",
-    title:' ',
-    legends: [{
-        label: "Alimentaire",
-        type: "circle",
-        radius: 6,
-        fillColor: '#fb8072',
-},{
-        label: "Bien etre",
-        type: "circle",
-        radius: 6,
-        fillColor: '#fccde5',
-},{
-        label: "Equipement Maison",
-        type: "circle",
-        radius: 6,
-        fillColor: '#8dd3c7',
-},{
-        label: "Textile",
-        type: "circle",
-        radius: 6,
-        fillColor: '#80b1d3',
-},{
-        label: "Don",
-        type: "circle",
-        radius: 6,
-        fillColor: '#ffffb3',
-},{
-        label: "Activite",
-        type: "circle",
-        radius: 6,
-        fillColor: '#bebada',
-},{
-        label: "Restauration",
-        type: "circle",
-        radius: 6,
-        fillColor: '#fdb462',
-},{
-        label: "Reparation",
-        type: "circle",
-        radius: 6,
-        fillColor: '#d9d9d9',
-},{
-    label: "Dechet",
-    type: "circle",
-    radius: 6,
-    fillColor: '#b3de69',
-}]
-}).addTo(map);
-
- */
 
 /////////////////////////////////////////////////////////////////////////////////
 ///////////// chopix du type de courses ////////////////
@@ -354,52 +272,64 @@ affiche_commerces(data)
 ////////////////////////////// creation de la bulle ///////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
 
+async function recherche_bulle(user_position){
+    //user_position.lat=45.7850;
+    //user_position.lng=4.8557;
+                //4.8357
+    if(liste_course.length>0){
+        if (bounds_gd_lyon.contains([[user_position.lat, user_position.lng]])==true){
+            // calcul de la bulle
+            
+            var data_fetch = await fetchAsync("/itineraire/"+JSON.stringify(user_position)+"&"+liste_course.toString())
+            
+            console.log(data_fetch);
+
+            if (data_fetch['message'] == 'pas de bulle'){
+                alert("Notre service ne trouve pas de bulle pour votre recherche...");
+
+            }
+            if (data_fetch['message'] == 'fund'){
+                // supprime les couches existantes
+
+                console.log(data_fetch['commerces_bulle']);
+                console.log(data_fetch['isochrone']);
+                console.log(data_fetch['bulle']);
+                console.log(data_fetch['itineraire']);
+                affiche_isochrone(JSON.parse(data_fetch['isochrone']));
+                affiche_bulle(JSON.parse(data_fetch['bulle']));
+                affiche_itineraire(JSON.parse(data_fetch['itineraire']).geometry);
+                }
+            }
+        else{
+            alert("vous êtes trop loin des commerces...");
+            }
+        }
+    else{
+        alert("vous devez choisir un type de courses avant de calculer un itinéraire ...");
+        }
+
+}
+
+
 document.getElementById('find_bulle').addEventListener("click", function() {
     
-    // recupere la posiotn de l'utilisateur
-    map.locate({setView: true, watch: false, maxZoom: 14})
-        .on('locationfound', position= async function (e) {
+    if(user_position==''){
+        // recupere la posiotn de l'utilisateur
+        map.locate({setView: true, watch: false, maxZoom: 14})
+
+        .on('locationfound', async function (e) {
             
-            
-            e.latlng.lat=45.7850;
-            e.latlng.lng=4.8557;
-            //4.8357
-            if(liste_course.length>0){
+            recherche_bulle(e.latlng,bounds_gd_lyon)
+        })
 
-                if (bounds_gd_lyon.contains([[e.latlng.lat, e.latlng.lng]])==true){
 
-                    // calcul de la bulle
-                    data_fetch = await fetchAsync("/itineraire/"+JSON.stringify(e.latlng)+"&"+liste_course.toString())
-
-                    if (data_fetch == 'pas de bulle'){
-                        alert("Notre service ne trouve pas de bulle pour votre recherche...");
-
-                    }
-                    else{
-                        // supprime les couches existantes
-                        group_layer.clearLayers();
-
-                        affiche_commerces(JSON.parse(data_fetch['commerces_bulle']));
-                        console.log(data_fetch['commerces_bulle'])
-                        affiche_isochrone(JSON.parse(data_fetch['isochrone']));
-                        affiche_bulle(JSON.parse(data_fetch['bulle']));
-                        affiche_itineraire(JSON.parse(data_fetch['itineraire']).geometry);
-                        }
-                    }
-
-                else{
-                    alert("vous êtes trop loin des commerces...");
-                    affiche_commerces(data);
-                    }
-                }
-            else{
-                alert("vous devez choisir un type de courses avant de calculer un itinéraire ...");
-                }
-            })
-            .on('locationerror', function(e){
-                alert("Où êtes vous?? Veuillez accorder l'accès à votre position actuelle dans votre navigateur.");
-            });
-
+        .on('locationerror', function(e){
+                alert("Où êtes vous?? Le service ne connais pas votre point de départ. Renseigner une adresse ou autoriser la geolocallisation dans votre navigateur ");
+        })
+    }
+    else{
+        recherche_bulle(user_position,bounds_gd_lyon)
+    }
 }, false);
 
 
